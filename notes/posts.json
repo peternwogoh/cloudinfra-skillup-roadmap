@@ -1,0 +1,18 @@
+[
+  {
+    "slug": "avs-nsxt-mtu-mismatch",
+    "title": "AVS NSX-T MTU mismatch — root cause and fix",
+    "date": "2026-07-28",
+    "tags": ["avs", "networking", "troubleshooting", "nsx-t"],
+    "file": "2026-07-28-avs-nsxt-mtu-mismatch.md",
+    "excerpt": "A customer's east–west traffic between AVS segments kept dropping large packets while pings worked fine. The culprit was a classic MTU mismatch between the NSX-T overlay and the underlay."
+  },
+  {
+    "slug": "welcome-to-my-notes",
+    "title": "Welcome to my notes",
+    "date": "2026-08-01",
+    "tags": ["meta", "cloud"],
+    "file": "2026-08-01-welcome-to-my-notes.md",
+    "excerpt": "Why I'm keeping a public notebook of everything I learn on the way from Infrastructure Engineer to CEO — and how these posts are published."
+  }
+]
