@@ -194,13 +194,31 @@
 
   // registry of every trackable item id -> phase number (for counting)
   const registry = [];
-  const reg = (id, phase) => { registry.push({ id, phase }); return id; };
+  const reg = (id, phase) => {
+    if (!registry.some((r) => r.id === id)) registry.push({ id, phase });
+    return id;
+  };
 
   /* --------------------------------------------------- project detail store */
-  // Free-text a user types into each project's document sections (Phase 9).
-  const PSTORE = "cisr-projects-v1";
-  const ploadAll = () => { try { return JSON.parse(localStorage.getItem(PSTORE)) || {}; }
-                           catch { return {}; } };
+  // Each project TYPE holds an ARRAY of project instances the user documents.
+  // Shape: { [ptid]: [ { _name?: str, <sectionSlug>: text, ... }, ... ] }
+  const PSTORE = "cisr-projects-v2";
+  function ploadAll() {
+    try {
+      const v2 = JSON.parse(localStorage.getItem(PSTORE));
+      if (v2 && typeof v2 === "object" && !Array.isArray(v2)) return v2;
+    } catch { /* ignore */ }
+    // migrate the older single-form shape { ptid: {section:text} } -> arrays
+    try {
+      const v1 = JSON.parse(localStorage.getItem("cisr-projects-v1"));
+      if (v1 && typeof v1 === "object") {
+        const out = {};
+        for (const k in v1) { const o = v1[k]; if (o && Object.keys(o).length) out[k] = [o]; }
+        return out;
+      }
+    } catch { /* ignore */ }
+    return {};
+  }
   let projects = ploadAll();
   const psave = () => localStorage.setItem(PSTORE, JSON.stringify(projects));
 
@@ -283,25 +301,31 @@
     return box;
   }
 
-  // how many of a project type's document sections have been filled in
-  function filledCount(ptid, sections) {
-    const rec = projects[ptid] || {};
-    return sections.filter((s) => (rec[slug(s)] || "").trim().length).length;
+  /* ----------------------------------------------- project (Phase 9) helpers */
+  const secText = (inst, s) => (inst[slug(s)] || "").trim();
+  const instFilled   = (inst, sections) => sections.filter((s) => secText(inst, s)).length;
+  const instComplete = (inst, sections) => sections.every((s) => secText(inst, s));
+  const instTouched  = (inst, sections) => sections.some((s) => secText(inst, s));
+  function typeStats(ptid, sections) {
+    const arr = projects[ptid] || [];
+    return { count: arr.length, complete: arr.filter((i) => instComplete(i, sections)).length };
   }
 
-  // one expandable project-type panel: header + the 9 document sections as inputs
+  function download(filename, text, mime) {
+    const url = URL.createObjectURL(new Blob([text], { type: mime }));
+    const a = el("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  // one expandable project-type panel: header + a list of documented projects
   function projectCard(p, type) {
-    const ptid  = reg(`p${p.n}-${slug(type)}`, p.n);
-    const rec   = projects[ptid] || {};
-    const total = p.sections.length;
+    const ptid = reg(`p${p.n}-${slug(type)}`, p.n);
+    const sections = p.sections;
+    const article = /^[aeiou]/i.test(type) ? "an" : "a";
 
     const card = el("div", "proj");
     card.dataset.pid = ptid;
-
-    // a fully-documented project counts as complete toward phase progress
-    const filled0 = filledCount(ptid, p.sections);
-    if (filled0 === total) { done.add(ptid); card.classList.add("is-complete"); }
-    else done.delete(ptid);
 
     const head = el("button", "proj__head");
     head.type = "button";
@@ -309,38 +333,93 @@
     head.innerHTML =
       `<span class="proj__tick" aria-hidden="true">✓</span>` +
       `<span class="proj__name">${type}</span>` +
-      `<span class="proj__meta"><b data-pfilled>${filled0}</b> / ${total} documented</span>` +
+      `<span class="proj__meta" data-pmeta></span>` +
       `<svg class="proj__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
       `stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
       `<path d="m6 9 6 6 6-6"/></svg>`;
 
-    const body = el("div", "proj__body");
-    p.sections.forEach((s, i) => {
-      const sid   = `${ptid}--${slug(s)}`;
-      const field = el("div", "proj__field");
-      field.innerHTML = `<label for="${sid}"><i>${i + 1}</i>${s}</label>`;
-      const ta = el("textarea");
-      ta.id = sid;
-      ta.rows = 2;
-      ta.placeholder = SECTION_HINT[s] || `Describe: ${s}`;
-      ta.value = rec[slug(s)] || "";
-      ta.addEventListener("input", () => {
-        const store = projects[ptid] || (projects[ptid] = {});
-        if (ta.value.trim()) store[slug(s)] = ta.value;
-        else delete store[slug(s)];
-        if (!Object.keys(store).length) delete projects[ptid];
-        psave();
+    const body     = el("div", "proj__body");
+    const instWrap = el("div", "proj__instances");
+    const addBtn   = el("button", "proj__add", `<span>+</span> Add ${article} ${type.toLowerCase()}`);
+    addBtn.type = "button";
 
-        const f = filledCount(ptid, p.sections);
-        head.querySelector("[data-pfilled]").textContent = f;
-        const complete = f === total;
-        card.classList.toggle("is-complete", complete);
-        if (complete) done.add(ptid); else done.delete(ptid);
-        save();
-        updateProgress();
+    function updateType() {
+      const { count, complete } = typeStats(ptid, sections);
+      head.querySelector("[data-pmeta]").textContent =
+        count ? `${count} project${count > 1 ? "s" : ""} · ${complete} complete` : "not started";
+      const anyComplete = complete >= 1;
+      card.classList.toggle("is-complete", anyComplete);
+      if (anyComplete) done.add(ptid); else done.delete(ptid);
+      save();
+      updateProgress();
+    }
+
+    function buildInstance(inst, idx) {
+      const wrap = el("div", "pinst");
+      if (instComplete(inst, sections)) wrap.classList.add("is-complete");
+
+      const ih = el("div", "pinst__head");
+      const badge = el("span", "pinst__badge", `${idx + 1}`);
+      const title = el("input", "pinst__title");
+      title.type = "text";
+      title.placeholder = `${type} #${idx + 1} — project name (optional)`;
+      title.value = inst._name || "";
+      title.addEventListener("input", () => {
+        if (title.value.trim()) inst._name = title.value; else delete inst._name;
+        psave();
       });
-      field.appendChild(ta);
-      body.appendChild(field);
+      const del = el("button", "pinst__del", "✕ Remove");
+      del.type = "button";
+      del.addEventListener("click", () => {
+        const label = inst._name ? `"${inst._name}"` : `${type} #${idx + 1}`;
+        if (!confirm(`Remove ${label}? This can't be undone.`)) return;
+        projects[ptid].splice(idx, 1);
+        if (!projects[ptid].length) delete projects[ptid];
+        psave(); renderInstances(); updateType();
+      });
+      ih.appendChild(badge); ih.appendChild(title); ih.appendChild(del);
+      wrap.appendChild(ih);
+
+      const fields = el("div", "pinst__fields");
+      sections.forEach((s, i) => {
+        const sid = `${ptid}__${idx}--${slug(s)}`;
+        const field = el("div", "proj__field");
+        field.innerHTML = `<label for="${sid}"><i>${i + 1}</i>${s}</label>`;
+        const ta = el("textarea");
+        ta.id = sid; ta.rows = 2;
+        ta.placeholder = SECTION_HINT[s] || `Describe: ${s}`;
+        ta.value = inst[slug(s)] || "";
+        ta.addEventListener("input", () => {
+          if (ta.value.trim()) inst[slug(s)] = ta.value; else delete inst[slug(s)];
+          psave();
+          wrap.classList.toggle("is-complete", instComplete(inst, sections));
+          updateType();
+        });
+        field.appendChild(ta);
+        fields.appendChild(field);
+      });
+      wrap.appendChild(fields);
+      return wrap;
+    }
+
+    function renderInstances() {
+      instWrap.innerHTML = "";
+      const arr = projects[ptid] || [];
+      if (!arr.length) {
+        instWrap.appendChild(el("p", "proj__empty",
+          `No projects yet — click "Add ${article} ${type.toLowerCase()}" to document one.`));
+      }
+      arr.forEach((inst, idx) => instWrap.appendChild(buildInstance(inst, idx)));
+    }
+
+    addBtn.addEventListener("click", () => {
+      (projects[ptid] || (projects[ptid] = [])).push({});
+      psave(); renderInstances(); updateType();
+      if (!card.classList.contains("is-open")) {
+        card.classList.add("is-open"); head.setAttribute("aria-expanded", "true");
+      }
+      const last = instWrap.querySelector(".pinst:last-child .pinst__title");
+      if (last) last.focus();
     });
 
     head.addEventListener("click", () => {
@@ -348,9 +427,35 @@
       head.setAttribute("aria-expanded", String(open));
     });
 
+    body.appendChild(instWrap);
+    body.appendChild(addBtn);
     card.appendChild(head);
     card.appendChild(body);
+
+    renderInstances();
+    updateType();
     return card;
+  }
+
+  function projectsToMarkdown(p) {
+    const lines = ["# Cloud Infrastructure — Project Portfolio", ""];
+    let any = false;
+    p.projectTypes.forEach((type) => {
+      const ptid = `p${p.n}-${slug(type)}`;
+      const arr = (projects[ptid] || []).filter((i) => instTouched(i, p.sections));
+      if (!arr.length) return;
+      any = true;
+      lines.push(`## ${type}`, "");
+      arr.forEach((inst, idx) => {
+        lines.push(`### ${inst._name ? inst._name : `${type} #${idx + 1}`}`, "");
+        p.sections.forEach((s) => {
+          const v = secText(inst, s);
+          lines.push(`**${s}**`, "", v || "_—_", "");
+        });
+      });
+    });
+    if (!any) lines.push("_No project details captured yet._", "");
+    return lines.join("\n");
   }
 
   function portfolioBody(p) {
@@ -358,8 +463,40 @@
     const pt  = el("div", "portfolio__types");
     pt.appendChild(el("h4", null, "Project types"));
     pt.appendChild(el("p", "portfolio__hint",
-      "Expand a project type and document a real project — every field saves to your " +
-      "browser as you type. A project type turns green once all nine sections are filled."));
+      "Expand a project type, then use “Add” to document one or more real projects of that " +
+      "kind. Every field saves to this browser as you type — no account needed. A type turns " +
+      "green once at least one project has all nine sections filled. Use Export to back up or " +
+      "move your data to another device."));
+
+    // export / import toolbar
+    const bar = el("div", "portfolio__bar");
+    const md = el("button", "pbtn", "⬇ Export Markdown"); md.type = "button";
+    md.addEventListener("click", () =>
+      download("cloud-projects.md", projectsToMarkdown(p), "text/markdown"));
+    const js = el("button", "pbtn", "⬇ Backup (JSON)"); js.type = "button";
+    js.addEventListener("click", () =>
+      download("cloud-projects-backup.json", JSON.stringify(projects, null, 2), "application/json"));
+    const imp = el("label", "pbtn pbtn--ghost", "⬆ Restore backup");
+    const file = el("input"); file.type = "file"; file.accept = "application/json,.json";
+    file.style.display = "none";
+    file.addEventListener("change", () => {
+      const f = file.files && file.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const data = JSON.parse(String(r.result));
+          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("bad");
+          localStorage.setItem(PSTORE, JSON.stringify(data));
+          alert("Backup restored. Reloading to apply…");
+          location.reload();
+        } catch { alert("That file isn't a valid projects backup (.json)."); }
+      };
+      r.readAsText(f);
+    });
+    imp.appendChild(file);
+    bar.appendChild(md); bar.appendChild(js); bar.appendChild(imp);
+    pt.appendChild(bar);
+
     const list = el("div", "projects");
     p.projectTypes.forEach((t) => list.appendChild(projectCard(p, t)));
     pt.appendChild(list);
@@ -492,18 +629,10 @@
     const btn = $("#reset-progress");
     if (!btn) return;
     btn.addEventListener("click", () => {
-      if (!confirm("Clear all tracked progress on this device?")) return;
-      done.clear(); save();
-      projects = {}; psave();
-      $$('input[type="checkbox"]').forEach((c) => (c.checked = false));
-      $$(".chip.is-done, .cert.is-done").forEach((c) => c.classList.remove("is-done"));
-      $$(".proj__body textarea").forEach((t) => (t.value = ""));
-      $$(".proj").forEach((c) => {
-        c.classList.remove("is-complete", "is-open");
-        const b = c.querySelector("[data-pfilled]"); if (b) b.textContent = "0";
-        const h = c.querySelector(".proj__head"); if (h) h.setAttribute("aria-expanded", "false");
-      });
-      updateProgress();
+      if (!confirm("Clear all tracked progress AND project details on this device?")) return;
+      localStorage.removeItem(STORE);
+      localStorage.removeItem(PSTORE);
+      location.reload();
     });
   }
 
