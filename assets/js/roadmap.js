@@ -20,6 +20,7 @@
     book:    '<path d="M4 4h11a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4Z"/><path d="M4 4v14"/>',
     cert:    '<circle cx="12" cy="9" r="6"/><path d="m9 14-2 7 5-3 5 3-2-7"/>',
     rocket:  '<path d="M5 15c-1 2-1 5-1 5s3 0 5-1M9 12a5 5 0 0 1 7-7c3 0 4 1 4 4a5 5 0 0 1-7 7Z"/><circle cx="14.5" cy="9.5" r="1.3"/>',
+    ai:      '<path d="M12 3l1.7 4.6L18 9l-4.3 1.4L12 15l-1.7-4.6L6 9l4.3-1.4L12 3Z"/><path d="M18.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3Z"/>',
   };
   const svg = (k) =>
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -127,7 +128,26 @@
         "Incident management", "Root Cause Analysis (RCA)", "Service Level Objectives (SLOs)"] }],
     },
     {
-      n: 9, kind: "portfolio", icon: "trophy",
+      n: 9, kind: "skills", icon: "ai",
+      title: "Weave AI Into Everything",
+      goal: "Use AI to design faster, automate deeper and deliver smarter — for yourself and for clients.",
+      c1: "#22d3ee", c2: "#6366f1",
+      groups: [
+        { name: "Azure AI", skills: ["Azure OpenAI Service", "Azure AI Foundry", "Azure AI Search",
+          "Azure AI Services (Cognitive)", "Microsoft Copilot Studio", "Copilot for Azure",
+          "AI-102 skills"] },
+        { name: "AWS & Google AI", skills: ["Amazon Bedrock", "Amazon SageMaker", "Amazon Q",
+          "Google Vertex AI", "Google Gemini"] },
+        { name: "Generative AI engineering", skills: ["Prompt engineering", "Retrieval-Augmented Generation (RAG)",
+          "Embeddings & vector databases", "LLM APIs", "AI agents & orchestration", "Model fine-tuning"] },
+        { name: "AI for operations (AIOps)", skills: ["GitHub Copilot", "AI-assisted troubleshooting",
+          "Log & anomaly detection", "Infrastructure automation with AI", "Runbook & script generation"] },
+        { name: "MLOps & responsible AI", skills: ["Model deployment & monitoring", "Responsible AI",
+          "AI security & prompt-injection defense", "Data privacy & governance", "AI cost management"] },
+      ],
+    },
+    {
+      n: 10, kind: "portfolio", icon: "trophy",
       title: "Build an Outstanding Portfolio",
       goal: "Turn real work into proof — document projects that show outcomes.",
       c1: "#a855f7", c2: "#7c3aed",
@@ -139,7 +159,7 @@
         "Lessons learned"],
     },
     {
-      n: 10, kind: "knowledge", icon: "book",
+      n: 11, kind: "knowledge", icon: "book",
       title: "Build Your Knowledge Base",
       goal: "Capture everything you learn — it becomes the company's intellectual property.",
       c1: "#f472b6", c2: "#fb7185",
@@ -184,6 +204,32 @@
     if (html != null) e.innerHTML = html;
     return e;
   };
+
+  /* ------------------- one-time migration: AI track = Phase 9 ---------------
+     The AI track was inserted as Phase 9 (2026-08), pushing Portfolio 9->10 and
+     Knowledge 10->11. Shift previously-saved localStorage keys so existing
+     progress and documented projects are preserved. Idempotent (flag-guarded). */
+  (function migrateAiPhase9() {
+    const FLAG = "cisr-migrated-ai-phase9";
+    try {
+      if (localStorage.getItem(FLAG)) return;
+      const remap = (id) =>
+        id.startsWith("p10-") ? "p11-" + id.slice(4)
+        : id.startsWith("p9-") ? "p10-" + id.slice(3)
+        : id;
+      // checkbox progress ids
+      let prog; try { prog = JSON.parse(localStorage.getItem("cisr-progress-v1")); } catch { prog = null; }
+      if (Array.isArray(prog)) localStorage.setItem("cisr-progress-v1", JSON.stringify(prog.map(remap)));
+      // documented projects keyed by portfolio ptid (p9-* -> p10-*)
+      let proj; try { proj = JSON.parse(localStorage.getItem("cisr-projects-v2")); } catch { proj = null; }
+      if (proj && typeof proj === "object" && !Array.isArray(proj)) {
+        const out = {};
+        for (const k in proj) out[k.startsWith("p9-") ? "p10-" + k.slice(3) : k] = proj[k];
+        localStorage.setItem("cisr-projects-v2", JSON.stringify(out));
+      }
+      localStorage.setItem(FLAG, "1");
+    } catch { /* migration is best-effort; never block the app */ }
+  })();
 
   /* ---------------------------------------------------------- progress store */
   const STORE = "cisr-progress-v1";
