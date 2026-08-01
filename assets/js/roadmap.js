@@ -172,10 +172,15 @@
   /* ----------------------------------------------------------------- certs */
   const CERTS = {
     current: [
-      { name: "VMware VCP", org: "VMware" },
-      { name: "Azure Administrator Associate", org: "AZ-104" },
-      { name: "Azure Network Engineer Associate", org: "AZ-700" },
       { name: "Azure AI Engineer Associate", org: "AI-102" },
+      { name: "Azure AI Fundamentals", org: "AI-900" },
+      { name: "Azure Network Engineer Associate", org: "AZ-700" },
+      { name: "Azure Administrator Associate", org: "AZ-104" },
+      { name: "Azure Fundamentals", org: "AZ-900" },
+      { name: "Red Hat Certified System Administrator", org: "RHCSA" },
+      { name: "VMware VCP", org: "VMware" },
+      { name: "Certified Technical Professional", org: "Commvault" },
+      { name: "Specialist — Power Systems (Power9)", org: "IBM" },
     ],
     next: [
       { name: "Security, Compliance & Identity Fundamentals", org: "SC-900" },
