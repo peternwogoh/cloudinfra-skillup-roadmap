@@ -196,6 +196,27 @@
   const registry = [];
   const reg = (id, phase) => { registry.push({ id, phase }); return id; };
 
+  /* --------------------------------------------------- project detail store */
+  // Free-text a user types into each project's document sections (Phase 9).
+  const PSTORE = "cisr-projects-v1";
+  const ploadAll = () => { try { return JSON.parse(localStorage.getItem(PSTORE)) || {}; }
+                           catch { return {}; } };
+  let projects = ploadAll();
+  const psave = () => localStorage.setItem(PSTORE, JSON.stringify(projects));
+
+  // helpful placeholder prompts for each document section
+  const SECTION_HINT = {
+    "Business problem":        "What did the customer need solved?",
+    "Customer environment":    "Size, stack, constraints, starting point…",
+    "Architecture":            "The design you built — services, topology…",
+    "Challenges":              "What made this hard?",
+    "Your solution":           "What you implemented, and why…",
+    "Automation used":         "Terraform / Ansible / Bicep / scripts…",
+    "Security considerations": "Identity, network, secrets, compliance…",
+    "Outcome":                 "Measurable results — cost, uptime, time saved…",
+    "Lessons learned":         "What you'd do differently next time…",
+  };
+
   /* ------------------------------------------------------------ build a chip */
   function chip(label, id) {
     const isDone = done.has(id);
@@ -262,23 +283,87 @@
     return box;
   }
 
+  // how many of a project type's document sections have been filled in
+  function filledCount(ptid, sections) {
+    const rec = projects[ptid] || {};
+    return sections.filter((s) => (rec[slug(s)] || "").trim().length).length;
+  }
+
+  // one expandable project-type panel: header + the 9 document sections as inputs
+  function projectCard(p, type) {
+    const ptid  = reg(`p${p.n}-${slug(type)}`, p.n);
+    const rec   = projects[ptid] || {};
+    const total = p.sections.length;
+
+    const card = el("div", "proj");
+    card.dataset.pid = ptid;
+
+    // a fully-documented project counts as complete toward phase progress
+    const filled0 = filledCount(ptid, p.sections);
+    if (filled0 === total) { done.add(ptid); card.classList.add("is-complete"); }
+    else done.delete(ptid);
+
+    const head = el("button", "proj__head");
+    head.type = "button";
+    head.setAttribute("aria-expanded", "false");
+    head.innerHTML =
+      `<span class="proj__tick" aria-hidden="true">✓</span>` +
+      `<span class="proj__name">${type}</span>` +
+      `<span class="proj__meta"><b data-pfilled>${filled0}</b> / ${total} documented</span>` +
+      `<svg class="proj__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
+      `stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+      `<path d="m6 9 6 6 6-6"/></svg>`;
+
+    const body = el("div", "proj__body");
+    p.sections.forEach((s, i) => {
+      const sid   = `${ptid}--${slug(s)}`;
+      const field = el("div", "proj__field");
+      field.innerHTML = `<label for="${sid}"><i>${i + 1}</i>${s}</label>`;
+      const ta = el("textarea");
+      ta.id = sid;
+      ta.rows = 2;
+      ta.placeholder = SECTION_HINT[s] || `Describe: ${s}`;
+      ta.value = rec[slug(s)] || "";
+      ta.addEventListener("input", () => {
+        const store = projects[ptid] || (projects[ptid] = {});
+        if (ta.value.trim()) store[slug(s)] = ta.value;
+        else delete store[slug(s)];
+        if (!Object.keys(store).length) delete projects[ptid];
+        psave();
+
+        const f = filledCount(ptid, p.sections);
+        head.querySelector("[data-pfilled]").textContent = f;
+        const complete = f === total;
+        card.classList.toggle("is-complete", complete);
+        if (complete) done.add(ptid); else done.delete(ptid);
+        save();
+        updateProgress();
+      });
+      field.appendChild(ta);
+      body.appendChild(field);
+    });
+
+    head.addEventListener("click", () => {
+      const open = card.classList.toggle("is-open");
+      head.setAttribute("aria-expanded", String(open));
+    });
+
+    card.appendChild(head);
+    card.appendChild(body);
+    return card;
+  }
+
   function portfolioBody(p) {
     const box = el("div", "portfolio");
-    const pt = el("div", "portfolio__types");
+    const pt  = el("div", "portfolio__types");
     pt.appendChild(el("h4", null, "Project types"));
-    const chips = el("div", "chips");
-    p.projectTypes.forEach((t) => chips.appendChild(chip(t, reg(`p${p.n}-${slug(t)}`, p.n))));
-    pt.appendChild(chips);
+    pt.appendChild(el("p", "portfolio__hint",
+      "Expand a project type and document a real project — every field saves to your " +
+      "browser as you type. A project type turns green once all nine sections are filled."));
+    const list = el("div", "projects");
+    p.projectTypes.forEach((t) => list.appendChild(projectCard(p, t)));
+    pt.appendChild(list);
     box.appendChild(pt);
-
-    const tpl = el("div", "portfolio__tpl");
-    tpl.appendChild(el("h4", null, "Every project documents"));
-    const flow = el("div", "flow");
-    p.sections.forEach((s, i) => {
-      flow.appendChild(el("span", "flow__step", `<i>${i + 1}</i>${s}`));
-    });
-    tpl.appendChild(flow);
-    box.appendChild(tpl);
     return box;
   }
 
@@ -409,8 +494,15 @@
     btn.addEventListener("click", () => {
       if (!confirm("Clear all tracked progress on this device?")) return;
       done.clear(); save();
+      projects = {}; psave();
       $$('input[type="checkbox"]').forEach((c) => (c.checked = false));
       $$(".chip.is-done, .cert.is-done").forEach((c) => c.classList.remove("is-done"));
+      $$(".proj__body textarea").forEach((t) => (t.value = ""));
+      $$(".proj").forEach((c) => {
+        c.classList.remove("is-complete", "is-open");
+        const b = c.querySelector("[data-pfilled]"); if (b) b.textContent = "0";
+        const h = c.querySelector(".proj__head"); if (h) h.setAttribute("aria-expanded", "false");
+      });
       updateProgress();
     });
   }

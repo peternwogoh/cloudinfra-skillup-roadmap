@@ -296,12 +296,42 @@ html[data-theme="light"] .phase__num { color: color-mix(in srgb, var(--c1) 78%, 
 /* portfolio */
 .portfolio { margin-top: 18px; display: grid; gap: 22px; }
 .portfolio h4 { font-family: var(--font-head); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--soft); margin-bottom: 12px; }
-.flow { display: flex; flex-wrap: wrap; gap: 8px; }
-.flow__step { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px;
-  background: var(--surface-solid); border: 1px solid var(--border); font-size: 0.85rem; color: var(--muted); }
-.flow__step i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-style: normal;
-  font-size: 0.72rem; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--c1), var(--c2)); }
+  color: var(--soft); margin-bottom: 6px; }
+.portfolio__hint { font-size: 0.86rem; color: var(--muted); line-height: 1.5; margin-bottom: 14px; max-width: 68ch; }
+
+.projects { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.proj { border: 1px solid var(--border); border-radius: 16px; background: var(--surface-solid); overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.proj:hover { border-color: var(--border-strong); }
+.proj.is-complete { border-color: color-mix(in srgb, var(--c1) 55%, var(--border)); }
+
+.proj__head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  background: none; border: 0; cursor: pointer; text-align: left; color: var(--text); font: inherit; }
+.proj__tick { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 0.7rem; font-weight: 800; color: transparent; background: var(--border-strong);
+  transition: background 0.2s ease, color 0.2s ease; }
+.proj.is-complete .proj__tick { color: #fff; background: linear-gradient(135deg, var(--c1), var(--c2)); }
+.proj__name { flex: 1; font-weight: 600; font-size: 0.96rem; }
+.proj__meta { flex: 0 0 auto; font-size: 0.74rem; color: var(--muted); padding: 3px 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); white-space: nowrap; }
+.proj__meta b { color: var(--soft); font-weight: 800; }
+.proj.is-complete .proj__meta { color: var(--c1); border-color: color-mix(in srgb, var(--c1) 40%, var(--border)); }
+.proj.is-complete .proj__meta b { color: var(--c1); }
+.proj__chev { flex: 0 0 auto; width: 18px; height: 18px; color: var(--muted); transition: transform 0.25s ease; }
+.proj.is-open .proj__chev { transform: rotate(180deg); }
+
+.proj__body { display: none; padding: 4px 16px 18px; gap: 14px; grid-template-columns: 1fr; }
+.proj.is-open .proj__body { display: grid; }
+.proj__field { display: grid; gap: 6px; }
+.proj__field label { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; color: var(--soft); }
+.proj__field label i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-style: normal;
+  font-size: 0.7rem; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--c1), var(--c2)); flex: 0 0 auto; }
+.proj__field textarea { width: 100%; resize: vertical; min-height: 44px; padding: 10px 12px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text); font: inherit; font-size: 0.88rem;
+  line-height: 1.5; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.proj__field textarea::placeholder { color: var(--muted); opacity: 0.7; }
+.proj__field textarea:focus { outline: none; border-color: var(--c1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 22%, transparent); }
 
 /* knowledge */
 .knowledge { margin-top: 18px; }
@@ -393,6 +423,7 @@ html[data-theme="light"] .phase__num { color: color-mix(in srgb, var(--c1) 78%, 
   .nav__menu.is-open { transform: none; opacity: 1; pointer-events: auto; }
   .theme-btn { align-self: flex-start; }
   .vision__cols { grid-template-columns: 1fr; }
+  .projects { grid-template-columns: 1fr; }
   .journey { gap: 10px; }
   .jstep__link { display: none; }
   .jstep { flex-basis: calc(50% - 6px); }
